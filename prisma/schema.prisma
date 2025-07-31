@@ -1,0 +1,49 @@
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  session_id    String    @id @default(auto()) @map("_id") @db.ObjectId
+  id            String    @unique
+  shop          String
+  state         String
+  isOnline      Boolean   @default(false)
+  scope         String?
+  expires       DateTime?
+  accessToken   String
+  userId        BigInt?
+  firstName     String?
+  lastName      String?
+  email         String?
+  accountOwner  Boolean   @default(false)
+  locale        String?
+  collaborator  Boolean?  @default(false)
+  emailVerified Boolean?  @default(false)
+}
+
+model BulkOperation {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  shop      String
+  shopifyId String?  // The ID Shopify returns for the bulk operation
+  type      String   // "EXPORT" or "IMPORT"
+  status    String   // e.g., "CREATED", "RUNNING", "COMPLETED", "FAILED"
+  url       String?  // URL from Shopify to download the result file
+  errorCode String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([shop])
+}
+
+model ProductTagsIndex {
+  id      String   @id @default(auto()) @map("_id") @db.ObjectId
+  shop    String   // your shop domain, if you support multiple stores
+  tags    String[] // stores unique tags as an array
+  updated DateTime @updatedAt
+}
