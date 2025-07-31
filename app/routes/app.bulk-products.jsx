@@ -374,6 +374,7 @@ export default function BulkProducts() {
   const [showTagsRefreshSuccess, setShowTagsRefreshSuccess] = useState(false);
   const loadMoreRef = useRef(null);
   const isLoading = navigation.state === "loading" || fetcher.state === "loading";
+  const [isAllSelected, setIsAllSelected] = useState(false);
 
   // Check for tags refresh success on mount
   useEffect(() => {
@@ -465,16 +466,36 @@ export default function BulkProducts() {
     }
   };
 
-  const handleSelectionChange = (newlySelectedOnPage) => {
+  const handleSelectionChange = (newSelected) => {
+    // Handle "All" selection
+    if (newSelected.includes("All")) {
+      setIsAllSelected(true);
+      const allProductIds = products.map((p) => p.node.id);
+      setSelectedItems(allProductIds);
+      return;
+    }
+
+    // Handle deselection of "All" or individual items
+    if (newSelected.length === 0) {
+      setIsAllSelected(false);
+      setSelectedItems([]);
+      return;
+    }
+
+    // Handle individual selections
+    setIsAllSelected(false); // Reset "All" state since individual items are selected
     const visibleIds = new Set(products.map((p) => p.node.id));
     setSelectedItems((prevSelected) => {
       const selectionsFromOtherPages = prevSelected.filter(
-        (id) => !visibleIds.has(id)
+        (id) => !visibleIds.has(id) && id !== "All"
       );
-      const merged = [...selectionsFromOtherPages, ...newlySelectedOnPage];
+      const merged = [...selectionsFromOtherPages, ...newSelected];
       return Array.from(new Set(merged));
     });
   };
+
+  // Update the ResourceList to reflect "All" selection
+  const isAllCheckboxChecked = isAllSelected || selectedItems.length === products.length;
 
   const getAdminUrl = (productId) => {
     const numericId = productId.split('/').pop();
@@ -687,14 +708,28 @@ export default function BulkProducts() {
               onSelectionChange={handleSelectionChange}
               selectable
               loading={isLoading}
+              showHeader={true}
+              // Optional: Use bulkActions to customize the "Select All" behavior if needed
+              bulkActions={[
+                {
+                  content: isAllCheckboxChecked ? "Deselect all" : "Select all",
+                  onAction: () => {
+                    if (isAllCheckboxChecked) {
+                      setIsAllSelected(false);
+                      setSelectedItems([]);
+                    } else {
+                      setIsAllSelected(true);
+                      const allProductIds = products.map((p) => p.node.id);
+                      setSelectedItems(allProductIds);
+                    }
+                  },
+                },
+              ]}
               renderItem={(item) => {
                 const { node } = item;
                 const image = node.images.edges[0]?.node?.originalSrc;
                 return (
-                  <ResourceItem
-                    id={node.id}
-                    aria-selected={selectedItems.includes(node.id)}
-                  >
+                  <ResourceItem id={node.id}>
                     <InlineStack align="start" gap="400" wrap={false}>
                       <Thumbnail
                         source={image || ""}
@@ -729,9 +764,7 @@ export default function BulkProducts() {
                   fontSize: "0.9rem",
                 }}
               >
-                {fetcher.state === "loading"
-                  ? "Loading more products..."
-                  : "Scroll to load more"}
+                {fetcher.state === "loading" ? "Loading more products..." : "Scroll to load more"}
               </div>
             )}
           </Card>
