@@ -359,6 +359,7 @@ export default function BulkProducts() {
   const [showSummary, setShowSummary] = useState(
     success && editedProducts && editedProducts.length > 0
   );
+  const [showSuccessMessage, setShowSuccessMessage] = useState(success); // New state for success message
   const [products, setProducts] = useState(initialProducts);
   const [pageInfo, setPageInfo] = useState(initialPageInfo);
   const [selectedItems, setSelectedItems] = useState([]);
@@ -372,31 +373,16 @@ export default function BulkProducts() {
   });
   const [isRefreshingTags, setIsRefreshingTags] = useState(false);
   const [showTagsRefreshSuccess, setShowTagsRefreshSuccess] = useState(false);
+  const [tagsRefreshError, setTagsRefreshError] = useState(null);
   const loadMoreRef = useRef(null);
   const isLoading = navigation.state === "loading" || fetcher.state === "loading";
   const [isAllSelected, setIsAllSelected] = useState(false);
 
-  // Check for tags refresh success on mount
-  useEffect(() => {
-    const tagsRefreshSuccess = localStorage.getItem('tagsRefreshSuccess');
-    if (tagsRefreshSuccess === 'true') {
-      setShowTagsRefreshSuccess(true);
-      localStorage.removeItem('tagsRefreshSuccess'); // Clear after showing
-    }
-  }, []);
-
-  useEffect(() => {
-    if (initialQuery === query) return;
-    const handler = setTimeout(() => {
-      updateFilters({ ...appliedFilters, query });
-    }, 500);
-    return () => clearTimeout(handler);
-  }, [query]);
-
   useEffect(() => {
     setProducts(initialProducts);
     setPageInfo(initialPageInfo);
-  }, [initialProducts]);
+    setShowSuccessMessage(success); // Sync success message with loader data
+  }, [initialProducts, initialPageInfo, success]);
 
   useEffect(() => {
     if (fetcher.data?.products) {
@@ -422,6 +408,14 @@ export default function BulkProducts() {
   };
 
   const handleQueryChange = useCallback((value) => setQuery(value), []);
+
+  useEffect(() => {
+    if (initialQuery === query) return;
+    const handler = setTimeout(() => {
+      updateFilters({ ...appliedFilters, query });
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [query]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -467,7 +461,6 @@ export default function BulkProducts() {
   };
 
   const handleSelectionChange = (newSelected) => {
-    // Handle "All" selection
     if (newSelected.includes("All")) {
       setIsAllSelected(true);
       const allProductIds = products.map((p) => p.node.id);
@@ -475,15 +468,13 @@ export default function BulkProducts() {
       return;
     }
 
-    // Handle deselection of "All" or individual items
     if (newSelected.length === 0) {
       setIsAllSelected(false);
       setSelectedItems([]);
       return;
     }
 
-    // Handle individual selections
-    setIsAllSelected(false); // Reset "All" state since individual items are selected
+    setIsAllSelected(false);
     const visibleIds = new Set(products.map((p) => p.node.id));
     setSelectedItems((prevSelected) => {
       const selectionsFromOtherPages = prevSelected.filter(
@@ -494,7 +485,6 @@ export default function BulkProducts() {
     });
   };
 
-  // Update the ResourceList to reflect "All" selection
   const isAllCheckboxChecked = isAllSelected || selectedItems.length === products.length;
 
   const getAdminUrl = (productId) => {
@@ -504,23 +494,36 @@ export default function BulkProducts() {
 
   const handleRefreshTags = async () => {
     setIsRefreshingTags(true);
+    setTagsRefreshError(null);
     try {
-      const res = await fetch("/api/reindex-tags", {
+      const res = await fetch(`/api/reindex-tags?shop=${shop}`, {
         method: "POST",
       });
       const data = await res.json();
       if (data.success) {
         console.log("✅ Tags were refreshed successfully.");
-        localStorage.setItem('tagsRefreshSuccess', 'true');
-        window.location.reload();
+        setShowTagsRefreshSuccess(true);
+        submit(new URLSearchParams(window.location.search), { replace: true });
       } else {
         console.error("❌ Failed to refresh tags:", data.error);
+        setTagsRefreshError(data.error || "Failed to refresh tags");
       }
     } catch (error) {
       console.error("❌ Failed to refresh tags:", error);
+      setTagsRefreshError(error.message || "Failed to refresh tags");
     } finally {
       setIsRefreshingTags(false);
     }
+  };
+
+  const handleDismissSuccess = () => {
+    setShowSummary(false);
+    setShowSuccessMessage(false);
+    // Optionally, clear the success query param to prevent reappearing
+    const params = new URLSearchParams(window.location.search);
+    params.delete("success");
+    params.delete("edited_ids");
+    submit(params, { replace: true });
   };
 
   return (
@@ -551,7 +554,7 @@ export default function BulkProducts() {
                 <Button
                   variant="plain"
                   icon={XIcon}
-                  onClick={() => setShowSummary(false)}
+                  onClick={handleDismissSuccess}
                   accessibilityLabel="Dismiss summary"
                 />
               </div>
@@ -560,7 +563,6 @@ export default function BulkProducts() {
                   The following {editedProducts.length} products were updated:
                 </Text>
               </div>
-
               <div
                 style={{
                   height: "250px",
@@ -606,28 +608,41 @@ export default function BulkProducts() {
               </div>
             </BlockStack>
           </Card>
-        ) : (
-          success && (
-            <Card sectioned tone="success">
-              <Text variant="bodyMd">
-                Your products have been updated successfully.
-              </Text>
-            </Card>
-          )
-        )}
-
-        {showTagsRefreshSuccess && (
+        ) : showSuccessMessage ? (
           <Card sectioned tone="success">
             <BlockStack gap="200">
               <InlineStack align="space-between">
                 <Text variant="bodyMd">
-                  Tags index has been refreshed successfully.
+                  Your products have been updated successfully.
                 </Text>
                 <Button
                   variant="plain"
                   icon={XIcon}
-                  onClick={() => setShowTagsRefreshSuccess(false)}
+                  onClick={handleDismissSuccess}
                   accessibilityLabel="Dismiss success message"
+                />
+              </InlineStack>
+            </BlockStack>
+          </Card>
+        ) : null}
+
+        {(showTagsRefreshSuccess || tagsRefreshError) && (
+          <Card sectioned tone={showTagsRefreshSuccess ? "success" : "critical"}>
+            <BlockStack gap="200">
+              <InlineStack align="space-between">
+                <Text variant="bodyMd">
+                  {showTagsRefreshSuccess
+                    ? "Tags index has been refreshed successfully."
+                    : tagsRefreshError}
+                </Text>
+                <Button
+                  variant="plain"
+                  icon={XIcon}
+                  onClick={() => {
+                    setShowTagsRefreshSuccess(false);
+                    setTagsRefreshError(null);
+                  }}
+                  accessibilityLabel="Dismiss message"
                 />
               </InlineStack>
             </BlockStack>
@@ -641,14 +656,14 @@ export default function BulkProducts() {
             </Text>
             <Text variant="bodyMd">
               If you have recently updated product tags outside this tool, please
-              click “Refresh Tags Index” before editing. This ensures you are
-              working with the most up-to-date tag list.
+              click “Refresh Tags Index” to ensure you are working with the most
+              up-to-date tag list.
             </Text>
             <Button
-              primary
+              variant="primary"
               onClick={handleRefreshTags}
               loading={isRefreshingTags}
-              disabled={false}
+              disabled={isRefreshingTags}
             >
               🔄 Refresh Tags Index
             </Button>
@@ -701,6 +716,13 @@ export default function BulkProducts() {
           />
 
           <Card>
+            {products.length === 0 && !isLoading && (
+              <div style={{ textAlign: "center", padding: "2rem" }}>
+                <Text variant="bodyMd" tone="subdued">
+                  No products have been found for this store.
+                </Text>
+              </div>
+            )}
             <ResourceList
               resourceName={{ singular: "product", plural: "products" }}
               items={products}
@@ -709,7 +731,6 @@ export default function BulkProducts() {
               selectable
               loading={isLoading}
               showHeader={true}
-              // Optional: Use bulkActions to customize the "Select All" behavior if needed
               bulkActions={[
                 {
                   content: isAllCheckboxChecked ? "Deselect all" : "Select all",

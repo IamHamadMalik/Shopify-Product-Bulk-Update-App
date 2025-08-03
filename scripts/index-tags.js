@@ -1,4 +1,3 @@
-// scripts/index-tags.js
 import { PrismaClient } from "@prisma/client";
 import fetch from "node-fetch";
 import dotenv from "dotenv";
@@ -7,24 +6,17 @@ dotenv.config();
 
 const prisma = new PrismaClient();
 
-export async function indexAllTags() {
-  const shop = process.env.SHOP;
+export async function indexAllTags(shop, accessToken) {
   if (!shop) {
-    console.error("❌ Missing SHOP in .env");
-    process.exit(1);
+    throw new Error("Missing SHOP parameter");
   }
 
-  const session = await prisma.session.findFirst({
-    where: { shop },
-  });
-
-  if (!session?.accessToken) {
-    console.error("❌ No access token found in DB for shop", shop);
-    process.exit(1);
+  if (!accessToken) {
+    throw new Error("Missing access token for shop");
   }
 
   const SHOPIFY_ADMIN_API_URL = `https://${shop}/admin/api/2024-07/graphql.json`;
-  const SHOPIFY_ADMIN_TOKEN = session.accessToken;
+  const SHOPIFY_ADMIN_TOKEN = accessToken;
 
   const PAGE_SIZE = 250;
   let allTags = new Set();
@@ -63,7 +55,7 @@ export async function indexAllTags() {
 
     if (data.errors) {
       console.error("❌ Shopify API errors:", data.errors);
-      break;
+      throw new Error(`Shopify API error: ${JSON.stringify(data.errors)}`);
     }
 
     const products = data.data.products.edges;
