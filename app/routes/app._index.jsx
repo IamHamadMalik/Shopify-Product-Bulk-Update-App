@@ -149,8 +149,7 @@ export default function Index() {
                     Make the desired edits to your selected products:
                   </Text>
                   <ul style={{ paddingLeft: "1.5rem", marginTop: "-0.5rem"}}>
-                    <li>You can see the bulk product field edit section — select a field from the dropdown and enter the value. When you apply changes, it will apply to all selected products.</li>
-                    <li>You can also edit each product individually with your desired values.</li>
+                    <li>You can edit each product individually with your desired values.</li>
                     <li>If the entries for a product are not correct, you can revert them back to their original values using the <strong>Reset This Product</strong> button.</li>
                     <li>When done, click <strong>Save All Changes</strong>. You will be redirected back to the main bulk update page.</li>
                   </ul>
