@@ -217,6 +217,7 @@ export default function BulkEdit() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bulkEditField, setBulkEditField] = useState("");
   const [bulkEditValue, setBulkEditValue] = useState("");
+  const [resetProducts, setResetProducts] = useState(new Set());
 
   const originals = useMemo(() => {
     const map = new Map();
@@ -237,17 +238,29 @@ export default function BulkEdit() {
       }
       return cp;
     }));
+    // Remove from resetProducts if user manually edits after reset
+    setResetProducts(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(pi);
+      return newSet;
+    });
   };
 
   const handleResetProduct = (pi) => {
     setItems(items =>
-      items.map((p, idx) => (idx === pi ? JSON.parse(JSON.stringify(products[pi])) : p))
+      items.map((p, idx) => {
+        if (idx !== pi) return p;
+        const originalProduct = JSON.parse(JSON.stringify(products[pi]));
+        return originalProduct;
+      })
     );
+    setResetProducts(prev => new Set(prev).add(pi));
   };
 
   const handleBulkEdit = () => {
     if (!bulkEditField || !bulkEditValue) return;
-    setItems(items => items.map((p) => {
+    setItems(items => items.map((p, pi) => {
+      if (resetProducts.has(pi)) return p; // Skip reset products
       const cp = { ...p };
       if (["price", "compareAtPrice", "inventoryQuantity"].includes(bulkEditField)) {
         cp.variants = cp.variants.map(v => ({ ...v, [bulkEditField]: bulkEditValue }));
@@ -256,6 +269,12 @@ export default function BulkEdit() {
       }
       return cp;
     }));
+    // Clear resetProducts for products affected by bulk edit
+    setResetProducts(prev => {
+      const newSet = new Set(prev);
+      items.forEach((_, pi) => newSet.delete(pi));
+      return newSet;
+    });
   };
 
   return (
@@ -266,60 +285,56 @@ export default function BulkEdit() {
       <Form method="post" onSubmit={() => setIsSubmitting(true)}>
         <BlockStack gap="400">
           <Card>
-          <BlockStack gap="400">
-            <Text variant="headingMd">Field Bulk Edit for All Products</Text>
-            <Text variant="bodyMd" fontWeight="bold" as="p">
-              Note: This will apply the same value to the selected field for <strong>all products</strong> at once.
-            </Text>
+            <BlockStack gap="400">
+              <Text variant="headingMd">Field Bulk Edit for All Products</Text>
+              <Text variant="bodyMd" fontWeight="bold" as="p">
+                Note: This will apply the same value to the selected field for <strong>all products</strong> at once.
+              </Text>
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: "1rem", flexWrap: "wrap" }}>
-              {/* Left: Field & Value */}
-              <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-                <div style={{ width: "250px" }}>
-                  <Select
-                    label="Field to Edit"
-                    options={[
-                      { label: "Select a field", value: "", disabled: true, hidden: true },
-                      ...FIELD_OPTIONS.filter(f => fieldsToEdit.includes(f.value))
-                    ]}
-                    value={bulkEditField}
-                    onChange={setBulkEditField}
-                  />
-                </div>
-                <div style={{ width: "250px" }}>
-                  <TextField
-                    label="Value"
-                    value={bulkEditValue}
-                    onChange={setBulkEditValue}
-                    placeholder="Enter new value"
-                    autoComplete="off"
-                    type={["price", "compareAtPrice", "inventoryQuantity"].includes(bulkEditField) ? "number" : "text"}
-                    prefix={["price", "compareAtPrice"].includes(bulkEditField) ? "$" : undefined}
-                  />
-                </div>
-              </div>
-
-              {/* Right: Apply to All Button */}
-              <div style={{ width: "200px"}}>
-                <Button
-                  onClick={handleBulkEdit}
-                  variant="primary"
-                  disabled={!bulkEditField || !bulkEditValue || isSubmitting}
-                  fullWidth
-                >
-                  <div style={{ margin: "3px"}}>
-                    Apply to All
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: "1rem", flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+                  <div style={{ width: "250px" }}>
+                    <Select
+                      label="Field to Edit"
+                      options={[
+                        { label: "Select a field", value: "", disabled: true, hidden: true },
+                        ...FIELD_OPTIONS.filter(f => fieldsToEdit.includes(f.value))
+                      ]}
+                      value={bulkEditField}
+                      onChange={setBulkEditField}
+                    />
                   </div>
+                  <div style={{ width: "250px" }}>
+                    <TextField
+                      label="Value"
+                      value={bulkEditValue}
+                      onChange={setBulkEditValue}
+                      placeholder="Enter new value"
+                      autoComplete="off"
+                      type={["price", "compareAtPrice", "inventoryQuantity"].includes(bulkEditField) ? "number" : "text"}
+                      prefix={["price", "compareAtPrice"].includes(bulkEditField) ? "$" : undefined}
+                    />
+                  </div>
+                </div>
 
-                </Button>
+                <div style={{ width: "200px" }}>
+                  <Button
+                    onClick={handleBulkEdit}
+                    variant="primary"
+                    disabled={!bulkEditField || !bulkEditValue || isSubmitting}
+                    fullWidth
+                  >
+                    <div style={{ margin: "3px" }}>
+                      Apply to All
+                    </div>
+                  </Button>
+                </div>
               </div>
-            </div>
-          </BlockStack>
+            </BlockStack>
 
-          <input type="hidden" name="bulkEditField" value={bulkEditField} />
-          <input type="hidden" name="bulkEditValue" value={bulkEditValue} />
-        </Card>
-
+            <input type="hidden" name="bulkEditField" value={bulkEditField} />
+            <input type="hidden" name="bulkEditValue" value={bulkEditValue} />
+          </Card>
 
           {items.map((p, pi) => (
             <Card key={p.id}>
@@ -404,7 +419,6 @@ export default function BulkEdit() {
             </Card>
           ))}
           <div style={{ marginBottom: '3rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            {/* Red Warning Text */}
             <p style={{
               color: 'red',
               fontWeight: 'bold',
@@ -414,7 +428,6 @@ export default function BulkEdit() {
               ⚠️ Note: Make sure your changes are correct, because once saved, they cannot be reverted.
             </p>
 
-            {/* Save Button */}
             <div style={{ width: '20%' }}>
               <button
                 type="submit"
