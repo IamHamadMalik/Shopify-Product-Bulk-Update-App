@@ -114,7 +114,9 @@ export const action = async ({ request }) => {
 
   if (bulkEditField && bulkEditValue) {
     updates.forEach(update => {
-      update[bulkEditField] = bulkEditValue;
+      if (!(bulkEditField in update)) {
+        update[bulkEditField] = bulkEditValue;
+      }
     });
   }
 
