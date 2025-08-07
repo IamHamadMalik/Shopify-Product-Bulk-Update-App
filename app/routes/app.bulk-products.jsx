@@ -539,7 +539,7 @@ export default function BulkProducts() {
                           <Button onClick={handleRefreshTags} loading={isRefreshingTags} disabled={isRefreshingTags}>
                             Refresh Tags
                           </Button>
-                          {showTagsRefreshSuccess && <Text tone="success">Tags index refreshed successfully.</Text>}
+                          {showTagsRefreshSuccess && <Text tone="success">Tags refreshed successfully for filter.</Text>}
                           {tagsRefreshError && <Text tone="critical">{tagsRefreshError}</Text>}
 
                           <div style={{ textAlign: "right" }}>

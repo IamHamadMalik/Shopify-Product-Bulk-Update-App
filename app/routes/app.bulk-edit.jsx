@@ -114,7 +114,8 @@ export const action = async ({ request }) => {
 
   if (bulkEditField && bulkEditValue) {
     updates.forEach(update => {
-      if (!(bulkEditField in update)) {
+      const hasManualField = Object.keys(update).includes(bulkEditField);
+      if (!hasManualField) {
         update[bulkEditField] = bulkEditValue;
       }
     });
