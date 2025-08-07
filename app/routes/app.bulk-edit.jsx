@@ -8,12 +8,23 @@ import {
   TextField,
   Button,
   Divider,
-  Spinner,
+  Select,
+  InlineStack,
 } from "@shopify/polaris";
 import { useState, useMemo } from "react";
 import { authenticate } from "../shopify.server";
 
-/** ------------------ LOADER (No changes here) ------------------ **/
+const FIELD_OPTIONS = [
+  { label: "Title", value: "title" },
+  { label: "Description", value: "descriptionHtml" },
+  { label: "Vendor", value: "vendor" },
+  { label: "Product Type", value: "productType" },
+  { label: "Tags", value: "tags" },
+  { label: "Price", value: "price" },
+  { label: "Compare At Price", value: "compareAtPrice" },
+  { label: "Inventory Quantity", value: "inventoryQuantity" },
+];
+
 export const loader = async ({ request }) => {
   const url = new URL(request.url);
   const ids = url.searchParams.get("ids");
@@ -66,6 +77,7 @@ export const loader = async ({ request }) => {
       }
     }
   `, { variables: { ids: ids.split(","), locationId } });
+
   const data = await productsRes.json();
 
   const products = data.data.nodes.map(p => ({
@@ -85,19 +97,26 @@ export const loader = async ({ request }) => {
   });
 };
 
-
-/** ------------------ ACTION (✅ UPDATED) ------------------ **/
 export const action = async ({ request }) => {
   const { admin } = await authenticate.admin(request);
   const formData = await request.formData();
+  const bulkEditField = formData.get("bulkEditField");
+  const bulkEditValue = formData.get("bulkEditValue");
 
   const updatesByProduct = {};
   for (const [key, value] of formData.entries()) {
+    if (key === "bulkEditField" || key === "bulkEditValue") continue;
     const [field, idx] = key.split(/_(.*)/s);
     if (!updatesByProduct[idx]) updatesByProduct[idx] = {};
     updatesByProduct[idx][field] = value;
   }
   const updates = Object.values(updatesByProduct);
+
+  if (bulkEditField && bulkEditValue) {
+    updates.forEach(update => {
+      update[bulkEditField] = bulkEditValue;
+    });
+  }
 
   const invChanges = updates
     .filter(u =>
@@ -175,12 +194,10 @@ export const action = async ({ request }) => {
     }
   }
 
-  // ✅ Get all unique product IDs that were part of the update
   const editedProductIds = [...new Set(
     updates.map(u => u.productId).filter(Boolean)
   )];
 
-  // ✅ Construct the redirect URL with the edited IDs
   const redirectUrl = new URL("/app/bulk-products", new URL(request.url).origin);
   redirectUrl.searchParams.set("success", "1");
   if (editedProductIds.length > 0) {
@@ -190,13 +207,13 @@ export const action = async ({ request }) => {
   return redirect(redirectUrl.toString());
 };
 
-
-/** ------------------ COMPONENT (No changes here) ------------------ **/
 export default function BulkEdit() {
   const { products, locationId, fieldsToEdit } = useLoaderData();
   const navigate = useNavigate();
   const [items, setItems] = useState(products);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [bulkEditField, setBulkEditField] = useState("");
+  const [bulkEditValue, setBulkEditValue] = useState("");
 
   const originals = useMemo(() => {
     const map = new Map();
@@ -219,6 +236,25 @@ export default function BulkEdit() {
     }));
   };
 
+  const handleResetProduct = (pi) => {
+    setItems(items =>
+      items.map((p, idx) => (idx === pi ? JSON.parse(JSON.stringify(products[pi])) : p))
+    );
+  };
+
+  const handleBulkEdit = () => {
+    if (!bulkEditField || !bulkEditValue) return;
+    setItems(items => items.map((p) => {
+      const cp = { ...p };
+      if (["price", "compareAtPrice", "inventoryQuantity"].includes(bulkEditField)) {
+        cp.variants = cp.variants.map(v => ({ ...v, [bulkEditField]: bulkEditValue }));
+      } else {
+        cp[bulkEditField] = bulkEditValue;
+      }
+      return cp;
+    }));
+  };
+
   return (
     <Page
       title="Bulk Edit Products"
@@ -226,6 +262,62 @@ export default function BulkEdit() {
     >
       <Form method="post" onSubmit={() => setIsSubmitting(true)}>
         <BlockStack gap="400">
+          <Card>
+          <BlockStack gap="400">
+            <Text variant="headingMd">Field Bulk Edit for All Products</Text>
+            <Text variant="bodyMd" fontWeight="bold" as="p">
+              Note: This will apply the same value to the selected field for <strong>all products</strong> at once.
+            </Text>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: "1rem", flexWrap: "wrap" }}>
+              {/* Left: Field & Value */}
+              <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+                <div style={{ width: "250px" }}>
+                  <Select
+                    label="Field to Edit"
+                    options={[
+                      { label: "Select a field", value: "", disabled: true, hidden: true },
+                      ...FIELD_OPTIONS.filter(f => fieldsToEdit.includes(f.value))
+                    ]}
+                    value={bulkEditField}
+                    onChange={setBulkEditField}
+                  />
+                </div>
+                <div style={{ width: "250px" }}>
+                  <TextField
+                    label="Value"
+                    value={bulkEditValue}
+                    onChange={setBulkEditValue}
+                    placeholder="Enter new value"
+                    autoComplete="off"
+                    type={["price", "compareAtPrice", "inventoryQuantity"].includes(bulkEditField) ? "number" : "text"}
+                    prefix={["price", "compareAtPrice"].includes(bulkEditField) ? "$" : undefined}
+                  />
+                </div>
+              </div>
+
+              {/* Right: Apply to All Button */}
+              <div style={{ width: "200px"}}>
+                <Button
+                  onClick={handleBulkEdit}
+                  variant="primary"
+                  disabled={!bulkEditField || !bulkEditValue || isSubmitting}
+                  fullWidth
+                >
+                  <div style={{ margin: "3px"}}>
+                    Apply to All
+                  </div>
+
+                </Button>
+              </div>
+            </div>
+          </BlockStack>
+
+          <input type="hidden" name="bulkEditField" value={bulkEditField} />
+          <input type="hidden" name="bulkEditValue" value={bulkEditValue} />
+        </Card>
+
+
           {items.map((p, pi) => (
             <Card key={p.id}>
               <BlockStack>
@@ -239,7 +331,6 @@ export default function BulkEdit() {
                 <div style={{ padding: '1rem' }}>
                   <BlockStack gap="400">
                     <input type="hidden" name={`productId_${pi}`} value={p.id} />
-
                     {fieldsToEdit.includes("title") && (
                       <TextField label="Title" value={p.title} onChange={v => handleChange(pi, null, "title", v)} name={`title_${pi}`} />
                     )}
@@ -255,48 +346,16 @@ export default function BulkEdit() {
                     {fieldsToEdit.includes("tags") && (
                       <TextField label="Tags" value={p.tags} onChange={v => handleChange(pi, null, "tags", v)} name={`tags_${pi}`} />
                     )}
-
                     {p.variants.map((v, vi) => {
                       const idx = `${pi}_${vi}`;
                       const origInv = originals.get(idx)?.inv ?? 0;
-
                       const showPrice = fieldsToEdit.includes("price");
                       const showCompareAt = fieldsToEdit.includes("compareAtPrice");
                       const showInventory = fieldsToEdit.includes("inventoryQuantity");
-
                       if (!showPrice && !showCompareAt && !showInventory) return null;
 
-                      if (p.variants.length === 1 && v.title === "Default Title") {
-                        return (
-                          <BlockStack key={v.id} gap="200" style={{ marginTop: '1rem' }}>
-                            {showPrice && (
-                              <TextField label="Price" value={v.price || ""} onChange={val => handleChange(pi, vi, "price", val)} name={`price_${idx}`} type="number" prefix="$" />
-                            )}
-                            {showCompareAt && (
-                              <TextField label="Compare At Price" value={v.compareAtPrice || ""} onChange={val => handleChange(pi, vi, "compareAtPrice", val)} name={`compareAtPrice_${idx}`} type="number" prefix="$" />
-                            )}
-                            {showInventory && (
-                              <>
-                                <TextField label="Inventory" value={v.inventoryQuantity} onChange={val => handleChange(pi, vi, "inventoryQuantity", val)} name={`inventoryQuantity_${idx}`} type="number" />
-                                <input type="hidden" name={`inventoryItemId_${idx}`} value={v.inventoryItem?.id || ""} />
-                                <input type="hidden" name={`locationId_${idx}`} value={locationId} />
-                                <input type="hidden" name={`originalInventoryQuantity_${idx}`} value={origInv} />
-                              </>
-                            )}
-                            <input type="hidden" name={`productId_${idx}`} value={p.id} />
-                            <input type="hidden" name={`variantId_${idx}`} value={v.id} />
-                          </BlockStack>
-                        );
-                      }
-
-                      
-                      return (
-                        <BlockStack
-                          key={v.id}
-                          style={{ border: '1px solid #ddd', borderRadius: 4, padding: '1rem', marginTop: '1rem' }}
-                        >
-                          <Text variant="bodyMd"><b>Variant:</b> {v.title}</Text>
-
+                      const variantFields = (
+                        <>
                           {showPrice && (
                             <TextField label="Price" value={v.price || ""} onChange={val => handleChange(pi, vi, "price", val)} name={`price_${idx}`} type="number" prefix="$" />
                           )}
@@ -313,34 +372,69 @@ export default function BulkEdit() {
                           )}
                           <input type="hidden" name={`productId_${idx}`} value={p.id} />
                           <input type="hidden" name={`variantId_${idx}`} value={v.id} />
+                        </>
+                      );
+
+                      if (p.variants.length === 1 && v.title === "Default Title") {
+                        return <BlockStack key={v.id} gap="200" style={{ marginTop: '1rem' }}>{variantFields}</BlockStack>;
+                      }
+
+                      return (
+                        <BlockStack key={v.id} style={{ border: '1px solid #ddd', borderRadius: 4, padding: '1rem', marginTop: '1rem' }}>
+                          <Text variant="bodyMd"><b>Variant:</b> {v.title}</Text>
+                          {variantFields}
                         </BlockStack>
                       );
                     })}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                      <Button
+                        onClick={() => handleResetProduct(pi)}
+                        disabled={isSubmitting}
+                        variant="secondary"
+                      >
+                        Reset This Product
+                      </Button>
+                    </div>
                   </BlockStack>
                 </div>
               </BlockStack>
             </Card>
           ))}
-          <div style={{marginBottom: '3rem'}}>
-            <div style={{ width: '100%' }}>
-            <Button
-              submit
-              primary
-              fullWidth
-              disabled={isSubmitting}
-              style={{ backgroundColor: 'black', color: 'white' }}
-            >
-              {isSubmitting ? 'Saving...' : 'Save All Changes'}
-            </Button>
-          </div>
-          {isSubmitting && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '1rem' }}>
-              <Spinner accessibilityLabel="Saving" size="small" />
-              <Text style={{ display: 'flex', alignItems: 'center'}} variant="bodyMd">Please wait, your changes are being saved…</Text>
+          <div style={{ marginBottom: '3rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {/* Red Warning Text */}
+            <p style={{
+              color: 'red',
+              fontWeight: 'bold',
+              margin: 0,
+              maxWidth: '70%',
+            }}>
+              ⚠️ Note: Make sure your changes are correct, because once saved, they cannot be reverted.
+            </p>
+
+            {/* Save Button */}
+            <div style={{ width: '20%' }}>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                style={{
+                  background: "#000",
+                  color: "white",
+                  border: "none",
+                  padding: "0.75rem 1.25rem",
+                  borderRadius: "4px",
+                  cursor: isSubmitting ? "not-allowed" : "pointer",
+                  opacity: isSubmitting ? 0.4 : 1,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  width: '100%',
+                  justifyContent: 'center',
+                }}
+              >
+                {isSubmitting ? 'Saving…' : 'Save All Changes'}
+              </button>
             </div>
-          )}
           </div>
-          
         </BlockStack>
       </Form>
     </Page>

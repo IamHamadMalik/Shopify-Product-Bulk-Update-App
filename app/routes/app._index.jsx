@@ -118,43 +118,54 @@ export default function Index() {
                   📋 Bulk Product Update — Instructions
                 </Text>
                 <Text as="p" variant="bodyMd" tone="subdued">
-                  Follow these simple steps to use the bulk product editor
-                  smoothly.
+                  Follow these simple steps to use the bulk product editor smoothly.
                 </Text>
-                <List type="number" spacing="loose">
-                  <List.Item>
-                    Open the <strong>Bulk Product Update</strong> page.
-                  </List.Item>
-                  <List.Item>
-                    At the top, click the <strong>Refresh Tag</strong> button.
-                    Run this once to fetch the latest tags for smooth filtering.
-                  </List.Item>
-                  <List.Item>
-                    Click <strong>Edit Fields</strong> and select which product
-                    fields you want to edit: title, description, vendor,
-                    product type, tags, price, compare-at price, or inventory
-                    quantity.
-                  </List.Item>
-                  <List.Item>
-                    Use the search and filters to find products by product type,
-                    vendor, collection, or tag.
-                  </List.Item>
-                  <List.Item>
-                    The list shows 50 products initially — scroll down to load
-                    more automatically.
-                  </List.Item>
-                  <List.Item>
-                    Select the products you want to edit, then click{" "}
-                    <strong>Next</strong> to open the bulk edit page.
-                  </List.Item>
-                  <List.Item>Make your bulk edits and save the changes.</List.Item>
-                  <List.Item>
-                    After saving, you’ll return to the bulk product page with a
-                    success message and a log of all edited products. Click a
-                    product in the log to open it in the admin in a new tab.
-                  </List.Item>
-                </List>
+
+                <BlockStack gap="300">
+                  <Text as="p"><strong>Step 1:</strong> Open the <strong>Bulk Product Update</strong> page.</Text>
+
+                  <Text as="p">
+                    <strong>Step 2:</strong> Open the <strong>Refresh Products Tags For Filtering</strong> tab and click on <strong>Refresh Tags</strong>.
+                    This is useful especially if the app was just installed or product tags were recently updated — it fetches all tags to use them in the filters. After that, click <strong>Next</strong>.
+                  </Text>
+
+                  <Text as="p">
+                    <strong>Step 3:</strong> The <strong>Product Selection</strong> tab will open. Here you can:
+                  </Text>
+                  <ul style={{ paddingLeft: "1.5rem", marginTop: "-0.5rem", marginBottom: "1rem" }}>
+                    <li>Search for specific products</li>
+                    <li>Filter by product type, vendor, collections, or tags</li>
+                    <li>Initially, 50 products are shown. When you scroll to the bottom, you'll see a "Load More Products" button — click it to display more products. Select desired products and click <strong>Next</strong></li>
+                  </ul>
+
+                  <Text as="p">
+                    <strong>Step 4:</strong> The <strong>Select Fields</strong> tab opens.
+                    Choose which product fields you want to bulk edit — either select all or choose specific ones like title, description, vendor, product type, tags, price, compare-at price, or inventory quantity.
+                    After selecting, click <strong>Next</strong>.
+                  </Text>
+
+                  <Text as="p" >
+                    <strong>Step 5:</strong> The <strong>Edit Products</strong> page will open.
+                    Make the desired edits to your selected products:
+                  </Text>
+                  <ul style={{ paddingLeft: "1.5rem", marginTop: "-0.5rem"}}>
+                    <li>You can see the bulk product field edit section — select a field from the dropdown and enter the value. When you apply changes, it will apply to all selected products.</li>
+                    <li>You can also edit each product individually with your desired values.</li>
+                    <li>If the entries for a product are not correct, you can revert them back to their original values using the <strong>Reset This Product</strong> button.</li>
+                    <li>When done, click <strong>Save All Changes</strong>. You will be redirected back to the main bulk update page.</li>
+                  </ul>
+
+                  <Text as="p">
+                    <strong>Step 6:</strong> You’ll now see a <strong>Log</strong> of all edited products at the top of the page.
+                    You can click the <strong>View</strong> button for any product to open its Shopify admin page and confirm the changes.
+                  </Text>
+
+                  <Text variant="bodyMd" tone="success">
+                    🎉 Hurrah! You’re done. Happy bulk editing your products!
+                  </Text>
+                </BlockStack>
               </BlockStack>
+
             </Card>
           </Layout.Section>
         </Layout>
